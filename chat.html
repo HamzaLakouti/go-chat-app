@@ -4,7 +4,28 @@
     <title>Chat App</title>
 </head>
 <body>
-    <h1>Welcome to the Chat Room</h1>
-    <p>This will later be a real chat box.</p>
+    <h1>Chat Room</h1>
+    <input type="text" id="msgInput" placeholder="Type a message..." />
+    <button onclick="sendMessage()">Send</button>
+
+    <ul id="messages"></ul>
+
+    <script>
+        const socket = new WebSocket("ws://localhost:8080/ws");
+
+        socket.onmessage = function(event) {
+            const msgList = document.getElementById("messages");
+            const li = document.createElement("li");
+            li.textContent = "Server: " + event.data;
+            msgList.appendChild(li);
+        };
+
+        function sendMessage() {
+            const input = document.getElementById("msgInput");
+            const message = input.value;
+            socket.send(message);
+            input.value = "";
+        }
+    </script>
 </body>
 </html>
