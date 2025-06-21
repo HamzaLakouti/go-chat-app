@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Chat App</title>
+    <title>Chat Room</title>
 </head>
 <body>
     <h1>Chat Room</h1>
@@ -16,7 +16,7 @@
         socket.onmessage = function(event) {
             const msgList = document.getElementById("messages");
             const li = document.createElement("li");
-            li.textContent = "Server: " + event.data;
+            li.textContent = "Friend: " + event.data;
             msgList.appendChild(li);
         };
 
@@ -24,6 +24,12 @@
             const input = document.getElementById("msgInput");
             const message = input.value;
             socket.send(message);
+
+            const msgList = document.getElementById("messages");
+            const li = document.createElement("li");
+            li.textContent = "Me: " + message;
+            msgList.appendChild(li);
+
             input.value = "";
         }
     </script>
