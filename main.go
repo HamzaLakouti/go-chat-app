@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"net/http"
+    "encoding/json"
 
 	"github.com/gorilla/websocket"
 )
@@ -16,6 +17,7 @@ var upgrader = websocket.Upgrader{
 type client struct {
     conn *websocket.Conn
     send chan []byte
+    username string
 }
 
 // Wrap message with its sender
@@ -83,13 +85,28 @@ func (c *client) readPump() {
         chatHub.unregister <- c
         c.conn.Close()
     }()
+
     for {
         _, msg, err := c.conn.ReadMessage()
         if err != nil {
             break
         }
-        // include the sender in the broadcast
-        chatHub.broadcast <- broadcastMsg{sender: c, message: msg}
+        
+        var incoming map[string]string
+        if err := json.Unmarshal(msg, &incoming); err!= nil {
+            continue
+        }
+
+        switch incoming["type"] {
+        case "join":
+            c.username = incoming["username"]
+            joinMsg := fmt.Sprintf("%s joined the chat", c.username)
+            chatHub.broadcast <- broadcastMsg{sender: nil, message: []byte(joinMsg)}
+        case "chat":
+            text := fmt.Sprintf("%s: %s", c.username, incoming["message"])
+            // include the sender in the broadcast
+            chatHub.broadcast <- broadcastMsg{sender: c, message: []byte(text)}
+        }
     }
 }
 

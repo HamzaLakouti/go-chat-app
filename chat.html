@@ -11,27 +11,39 @@
     <ul id="messages"></ul>
 
     <script>
-        const socket = new WebSocket("ws://localhost:8080/ws");
+    let username = prompt("Enter your name:");
+    const socket = new WebSocket("ws://localhost:8080/ws");
 
-        socket.onmessage = function(event) {
-            const msgList = document.getElementById("messages");
-            const li = document.createElement("li");
-            li.textContent = "Friend: " + event.data;
-            msgList.appendChild(li);
-        };
+    socket.onopen = function() {
+        // Tell server your username
+        socket.send(JSON.stringify({ type: "join", username: username }));
+    };
 
-        function sendMessage() {
-            const input = document.getElementById("msgInput");
-            const message = input.value;
-            socket.send(message);
+    socket.onmessage = function(event) {
+        const msgList = document.getElementById("messages");
+        const li = document.createElement("li");
+        li.textContent = event.data;
+        msgList.appendChild(li);
+    };
 
-            const msgList = document.getElementById("messages");
-            const li = document.createElement("li");
-            li.textContent = "Me: " + message;
-            msgList.appendChild(li);
+    function sendMessage() {
+        const input = document.getElementById("msgInput");
+        const message = input.value;
 
-            input.value = "";
-        }
+        // Send chat message
+        socket.send(JSON.stringify({
+            type: "chat",
+            username: username,
+            message: message
+        }));
+
+        const msgList = document.getElementById("messages");
+        const li = document.createElement("li");
+        li.textContent = "Me: " + message;
+        msgList.appendChild(li);
+
+        input.value = "";
+    }
     </script>
 </body>
 </html>
