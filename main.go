@@ -2,10 +2,14 @@ package main
 
 import (
 	"fmt"
+    "os"
 	"net/http"
     "encoding/json"
+    "database/sql"
 
 	"github.com/gorilla/websocket"
+    "github.com/joho/godotenv"
+    _ "github.com/lib/pq"
 )
 
 var upgrader = websocket.Upgrader{
@@ -91,20 +95,45 @@ func (c *client) readPump() {
         if err != nil {
             break
         }
-        
+
         var incoming map[string]string
-        if err := json.Unmarshal(msg, &incoming); err!= nil {
+        if err := json.Unmarshal(msg, &incoming); err != nil {
             continue
         }
 
         switch incoming["type"] {
         case "join":
             c.username = incoming["username"]
+
+            // Send last 50 messages to just this user
+            rows, err := db.Query(`SELECT username, message FROM messages ORDER BY id DESC LIMIT 50`)
+            if err == nil {
+                defer rows.Close()
+                var history []string
+                for rows.Next() {
+                    var uname, m string
+                    rows.Scan(&uname, &m)
+                    history = append([]string{fmt.Sprintf("%s: %s", uname, m)}, history...)
+                }
+                for _, h := range history {
+                    c.send <- []byte(h)
+                }
+            }
+
+            // Notify everyone that this user joined
             joinMsg := fmt.Sprintf("%s joined the chat", c.username)
             chatHub.broadcast <- broadcastMsg{sender: nil, message: []byte(joinMsg)}
+
         case "chat":
             text := fmt.Sprintf("%s: %s", c.username, incoming["message"])
-            // include the sender in the broadcast
+
+            // Save message in DB
+            _, err := db.Exec(`INSERT INTO messages (username, message) VALUES ($1, $2)`, c.username, incoming["message"])
+            if err != nil {
+                fmt.Println("DB insert error:", err)
+            }
+
+            // Broadcast message
             chatHub.broadcast <- broadcastMsg{sender: c, message: []byte(text)}
         }
     }
@@ -127,7 +156,27 @@ func chatHandler(w http.ResponseWriter, r *http.Request) {
     http.ServeFile(w, r, "chat.html")
 }
 
+var db *sql.DB
+
+func initDB() {
+    godotenv.Load()
+    connStr := os.Getenv("DATABASE_URL")
+
+    var err error
+    db, err = sql.Open("postgres", connStr)
+    if err != nil {
+        panic(err)
+    }
+
+    if err := db.Ping(); err != nil {
+        panic(err)
+    }
+
+    fmt.Println("Connected to database")
+}
+
 func main() {
+    initDB()
 	go chatHub.run()
 	
 	http.HandleFunc("/", homeHandler)
